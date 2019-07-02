@@ -6,4 +6,3 @@ app.config.json
 app.config.*.json
 awsCredentials.json
 logs
-
