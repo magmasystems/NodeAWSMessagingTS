@@ -1,8 +1,8 @@
 version: '2.1'
 
 services:
-  sbsmessaging:
-    image: sbsmessaging
+  awsmessaging:
+    image: awsmessaging
     build: .
     environment:
       NODE_ENV: production

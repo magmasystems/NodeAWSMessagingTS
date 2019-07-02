@@ -5,7 +5,7 @@ module.exports = {
    */
   apps: [
     {
-      name: 'SBSMessaging',
+      name: 'AWSMessaging',
       script: './dist/app.js',
       env: {
         COMMON_VARIABLE: 'true',

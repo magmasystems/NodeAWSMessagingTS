@@ -24,11 +24,11 @@ Add the following configuration to launch.json
 
 Run the Docker container like this:
 
-    docker run -d -p 3050:3050 -p 5858:5858 sbsmessaging
+    docker run -d -p 3050:3050 -p 5858:5858 awsmessaging
 
 If you don't want the container running in the background, then leave out the -d    
 
-    docker run -p 3050:3050 -p 5858:5858 sbsmessaging
+    docker run -p 3050:3050 -p 5858:5858 awsmessaging
 
 
 Examine the Filesystem of an image
