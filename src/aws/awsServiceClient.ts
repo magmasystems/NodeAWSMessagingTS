@@ -4,12 +4,13 @@
 /// <reference types="aws-sdk" />
 import * as AWS from 'aws-sdk';
 import { EventEmitter2 } from 'eventemitter2';
+import express = require('express');
 import { AWSMessagingApiManager } from '../awsMessagingApiManager';
-import { AWSMessagingServerSettings, IAWSMessagingServerSettings } from '../awsMessagingServerSettings';
 import { AWSServiceEventPublisher } from '../awsServiceEventPublisher';
+import { IDisposable, using } from '../framework/using';
 import { TSLogger } from '../logging/tslogger';
-import { IDisposable, using } from '../using';
-import { SBSAWSClient } from './awsClient';
+import { IServiceCreationArgs } from '../services/serviceCreationArgs';
+import { AWSClient } from './awsClient';
 
 /**
  * AWSServiceClient
@@ -26,10 +27,10 @@ export abstract class AWSServiceClient implements IDisposable
     /**
      * AWSClient
      *
-     * @type {SBSAWSClient}
+     * @type {AWSClient}
      * @memberof AWSServiceClient
      */
-    public AWSClient: SBSAWSClient;
+    public AWSClient: AWSClient;
 
     /**
      * Name
@@ -83,17 +84,17 @@ export abstract class AWSServiceClient implements IDisposable
     public get Manager(): AWSMessagingApiManager { return this.apiManager; }
     public set Manager(val: AWSMessagingApiManager) { this.apiManager = val; }
 
-    constructor(serviceType: string, name: string, settings?: IAWSMessagingServerSettings)
+    constructor(args: IServiceCreationArgs)
     {
         const inst = ++AWSServiceClient.instanceNumber;
 
         // this.Name = `${name}_${AWSServiceClient.ServiceClientInstanceNumber++}`;
-        this.Name = `${name}`;
-        this.ServiceType = serviceType;
-        this.AWSClient = new SBSAWSClient(name, settings);
+        this.Name = `${args.Name}`;
+        this.ServiceType = args.ServiceType || 'AWS Messaging';
+        this.AWSClient = new AWSClient(args.Name, args.Settings);
         this.Config = this.AWSClient.Configuration;
         this.Logger = new TSLogger().createLogger(`${this.Name}-${inst}`, []);
-        this.EventPublisher = new AWSServiceEventPublisher(name);
+        this.EventPublisher = new AWSServiceEventPublisher(this.Name);
     }
 
     public dispose(): void
@@ -105,6 +106,21 @@ export abstract class AWSServiceClient implements IDisposable
     public getServiceConfiguration(): any
     {
         return this.AWSClient.Configuration;
+    }
+
+    protected getEntityName(): string
+    {
+        return this.Name.endsWith("Service") ? this.Name.replace("Service", "") : this.Name;
+    }
+
+    public createApi(router: express.Router): void
+    {
+        router.route(`/${this.Name}`).get((req, resp) =>
+        {
+            this.Logger.info(`Got a simple GET request for the service: Name ${req.params.queue}`);
+            resp.status(200).json({ serviceName: this.Name });
+
+        });
     }
 
     public getCurrentInfoMap(): {}

@@ -4,14 +4,13 @@
 /// <reference types="aws-sdk" />
 import * as AWS from 'aws-sdk';
 import * as SNS from 'aws-sdk/clients/sns';
+import express = require('express');
 import { AppContext } from '../appContext';
-import { AWSMessagingApiManager } from '../awsMessagingApiManager';
-import { AWSMessagingServerSettings, IAWSMessagingServerSettings } from '../awsMessagingServerSettings';
 import { AWSResourceInfoBase } from '../awsResourceInfoBase';
 import { AWSResourceWatcher } from '../awsResourceWatcher';
 import { IServiceCreationArgs } from '../services/serviceCreationArgs';
 import { AWSServiceClient } from './awsServiceClient';
-import { SQSQueueInfo } from './sqsClient';
+import { SQSClient, SQSQueueInfo } from './sqsClient';
 
 /**
  *
@@ -46,16 +45,11 @@ export class SNSClient extends AWSServiceClient
 
     constructor(args: IServiceCreationArgs)
     {
-        super('SNS', args.Name, args.Settings);
+        args.Name = 'SNS';
+        super(args);
+
         this.InternalClient = this.createClient();
         this.initTopicMap(undefined);
-    }
-
-    private constructor2(name: string = 'SNS Client', attrs?: any, settings?: IAWSMessagingServerSettings)
-    {
-        // super('SNS', name, settings);
-        this.InternalClient = this.createClient();
-        this.initTopicMap(attrs);
     }
 
     private initTopicMap(attrs?: any)
@@ -92,6 +86,149 @@ export class SNSClient extends AWSServiceClient
         return super.getServiceConfiguration().sns;
     }
 
+    public createApi(router: express.Router): void
+    {
+      // Create a topic
+      router.route(`/topic/create`).post((req, resp) =>
+      {
+          const topicName: string = req.body.Name;
+
+          // Get the attributes
+          // The SNS CreateTopic function does not use attributes when the topic is created, but let's
+          // take them in the REST API body, just in case .... we mnight use them internally in this framework.
+          const attrs = req.body || {};
+
+          this.Logger.info(`Create Topic request received: Name ${topicName}`);
+
+          this.createTopic(topicName, attrs)
+              .then((topicInfo) => { resp.status(201).json(topicInfo); })
+              .catch((err) => { resp.status(400).json({error: err}); });
+      });
+
+      // Maybe create a topic and publish a message
+      router.route(`/topic/:topic/send/:body`).get((req, resp) =>
+      {
+          this.Logger.info(`Send Message to Topic request received: Name ${req.params.topic}`);
+
+          this.createTopic(req.params.topic)
+            .then((result) =>
+            {
+                this.publish(result, null, req.params.body)
+                    .then((sendMessageResult) => resp.status(200).json(sendMessageResult))
+                    .catch((err) => resp.status(400).json({error: err}));
+            })
+            .catch((err) =>
+            {
+                resp.status(400).json({error: err});
+            });
+      });
+
+      // Get the urls of all topics
+      router.route(`/topic`).get((req, resp) =>
+      {
+          this.listTopics()
+            .then((topics) => { resp.status(200).json(topics); })
+            .catch((err) => { resp.status(400).json({error: err}); });
+      });
+
+      // Get the info of all topics
+      router.route(`/topic/info`).get((req, resp) =>
+      {
+          this.getAllInfo()
+            .then((topics) => { resp.status(200).json(topics); })
+            .catch((err) => { resp.status(400).json({error: err}); });
+      });
+
+      // Get info about a topic
+      router.route(`/topic/:topic`)
+        .get((req, resp) =>
+        {
+            this.getTopicInfo(req.params.topic, req.query.create || false)
+                .then((topicInfo) => { resp.status(200).json(topicInfo); })
+                .catch((err) => { resp.status(400).json({error: err}); });
+        })
+        // Delete a topic
+        .delete((req, resp) =>
+        {
+            const params = new SNSTopicInfo(req.params.topic, null);
+            this.Logger.info(`Delete Topic request received: Name ${req.params.topic}`);
+
+            this.deleteTopic(params)
+                .then((result) => { resp.status(200).json({status: result}); })
+                .catch((err) => { resp.status(400).json({error: err}); });
+        });
+
+      // Subscribe to a topic via a queue
+      router.route(`/topic/:topic/subscribe/:queue`).get((req, resp) =>
+      {
+          this.Logger.info(`Subscribe request received: topic ${req.params.topic}, queue ${req.params.queue}`);
+
+          // We need to make sure that the topic and queue exist, and then get the ARN of the topi
+          this.getTopicAndQueueInfo(req.params.topic, req.params.queue)
+            .then((infos) =>
+            {
+                this.subscribeToSQS(infos[0], infos[1])
+                .then((subscription) =>
+                {
+                    this.Logger.info(`Subscribe request returned subscriptionArn: ${subscription}`);
+                    resp.status(200).json({subscriptionArn: subscription});
+                })
+                .catch((err) =>
+                {
+                    this.Logger.error(err);
+                    resp.status(400).json({error: err});
+                });
+            })
+            .catch((err) =>
+            {
+                this.Logger.error(err);
+                resp.status(400).json({error: err});
+            });
+      });
+
+      // Subscribe to a topic via a protocol and endpoint
+      router.route(`/topic/subscribe`).post((req, resp) =>
+      {
+          this.Logger.info(`Subscribe request received: topic ${req.body.topic}, endpoint ${req.body.endpoint}, protocol ${req.body.protocol}`);
+
+          // We need to make sure that the topic exists, and then get the ARN of the topic
+          this.getTopicInfo(req.body.topic)
+              .then((infos) =>
+              {
+                this.subscribe(infos[0], req.body.protocol, req.body.endpoint)
+                    .then((subscription) =>
+                    {
+                        this.Logger.info(`Subscribe request returned subscriptionArn: ${subscription}`);
+                        resp.status(200).json({subscriptionArn: subscription});
+                    })
+                    .catch((err) =>
+                    {
+                        this.Logger.error(err);
+                        resp.status(400).json({error: err});
+                    });
+              })
+              .catch((err) =>
+              {
+                this.Logger.error(err);
+                resp.status(400).json({error: err});
+              });
+      });
+
+      // Unsubscribe from a topic
+      router.route(`/topic/unsubscribe/:subscription`).get((req, resp) =>
+      {
+          this.unsubscribe(req.params.subscription)
+            .then((rcStatus) =>
+            {
+                resp.status(200).json({ status: rcStatus });
+            })
+            .catch((err) =>
+            {
+                resp.status(400).json({error: err});
+            });
+      });
+    }
+
     /**
      * swapInfoMap
      * This gets called when the AWS list of all of the Topics/Queues has changed.
@@ -112,6 +249,16 @@ export class SNSClient extends AWSServiceClient
     public getCurrentInfoMap(): {}
     {
         return SNSClient.TopicMap;
+    }
+
+    private async getTopicAndQueueInfo(topicName, queueName): Promise<[SNSTopicInfo, SQSQueueInfo]>
+    {
+        const sqsClient: SQSClient = this.Manager.getService<SQSClient>("SQS");
+
+        const topicInfo = await this.getTopicInfo(topicName, true);
+        const queueInfo = await sqsClient.getQueueInfo(queueName, true);
+
+        return [topicInfo, queueInfo];
     }
 
     /**

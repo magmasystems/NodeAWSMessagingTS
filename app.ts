@@ -3,10 +3,9 @@ import * as socketio from 'socket.io';
 import * as WebSocket from 'ws';
 import { AppContext } from './src/appContext';
 import { AWSMessagingServer } from './src/awsMessagingServer';
-import { AWSMessagingServerSettings } from './src/awsMessagingServerSettings';
 import { AWSServiceEventPublisher } from './src/awsServiceEventPublisher';
+import { IDisposable, using } from './src/framework/using';
 import { TSLogger } from './src/logging/tslogger';
-import { IDisposable, using } from './src/using';
 import { NewmanCollectionRunner } from './tests/newmanCollectionRunner';
 import { SQSTester } from './tests/sqsTests';
 

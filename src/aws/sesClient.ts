@@ -1,7 +1,7 @@
 import { SES } from "aws-sdk";
 import { SendEmailRequest } from "aws-sdk/clients/ses";
+import express = require("express");
 import { AppContext } from "../appContext";
-import { IAWSMessagingServerSettings } from "../awsMessagingServerSettings";
 import { ISendEmailRequest } from "../email/sendEmailRequest";
 import { IServiceCreationArgs } from "../services/serviceCreationArgs";
 import { AWSServiceClient } from "./awsServiceClient";
@@ -13,17 +13,10 @@ export class SESClient extends AWSServiceClient
 
     constructor(args: IServiceCreationArgs)
     {
-        super('SES', 'SES Client', args.Settings);
+        args.Name = 'SES';
+        super(args);
+
         this.InternalClient = this.createClient();
-
-        this.NoSend = AppContext.Configuration.appSettings.email.noSend || false;
-    }
-
-    private constructor2(settings?: IAWSMessagingServerSettings)
-    {
-        // super('SES', 'SES Client', settings);
-        this.InternalClient = this.createClient();
-
         this.NoSend = AppContext.Configuration.appSettings.email.noSend || false;
     }
 
@@ -45,6 +38,14 @@ export class SESClient extends AWSServiceClient
     private deleteClient(): void
     {
         // There doesn't seem to be a dispose() function for the SES class
+    }
+
+    public createApi(router: express.Router): void
+    {
+        super.createApi(router);
+
+        // let entity = this.getEntityName();
+        // router.route(`/${entity}/customers`).get((req, resp)     => this.getAllCustomers(req, resp));
     }
 
     public getAllInfo(): Promise<{}>

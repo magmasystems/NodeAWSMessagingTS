@@ -12,8 +12,8 @@ import { AWSServiceClient } from './awsServiceClient';
 
 import * as AWSMock from 'aws-sdk-mock';
 import { AWSError } from 'aws-sdk/lib/error';
-import { AWSMessagingApiManager } from '../awsMessagingApiManager';
-import { AWSMessagingServerSettings, IAWSMessagingServerSettings } from '../awsMessagingServerSettings';
+import express = require('express');
+import { IAWSMessagingServerSettings } from '../awsMessagingServerSettings';
 import { IServiceCreationArgs } from '../services/serviceCreationArgs';
 
 export type MessageReceivedCallback = (msg: SQS.Message) => void;
@@ -54,7 +54,8 @@ export class SQSClient extends AWSServiceClient
 
     constructor(args: IServiceCreationArgs)
     {
-        super('SQS', args.Name, args.Settings);
+        args.Name = 'SQS';
+        super(args);
 
         this.DeleteMessageAfterConsuming = this.AWSClient.Configuration.sqs.deleteMessageAfterConsuming || true;
 
@@ -62,18 +63,6 @@ export class SQSClient extends AWSServiceClient
 
         this.InternalClient = this.createClient();
         this.initQueueMap(undefined);
-    }
-
-    private constructor2(name: string = 'SQS Client', attrs?: any, settings?: IAWSMessagingServerSettings)
-    {
-        // super('SQS', name, settings);
-
-        this.DeleteMessageAfterConsuming = this.AWSClient.Configuration.sqs.deleteMessageAfterConsuming || true;
-
-        // The mocking should be done before the actual AWS service is created
-
-        this.InternalClient = this.createClient();
-        this.initQueueMap(attrs);
     }
 
     private initQueueMap(attrs?: any)
@@ -118,6 +107,137 @@ export class SQSClient extends AWSServiceClient
     private deleteClient(): void
     {
         // There doesn't seem to be a dispose() function for the SQS class
+    }
+
+    public createAPIs(router: express.Router): void
+    {
+      // Create a Queue
+      router.route(`/queue/create`).post((req, resp) =>
+      {
+        const queueName: string = req.body.Name;
+
+        // Get the attributes
+        const attrs = req.body || {};
+
+        this.Logger.info(`Create Queue request received: Name ${queueName}`);
+
+        this.createQueue(queueName, attrs)
+          .then((queueInfo) =>
+          {
+              resp.status(201).json(queueInfo);
+          })
+          .catch((err) =>
+          {
+              resp.status(400).json({error: err});
+          });
+      });
+
+      // Maybe create a Queue and send a message
+      router.route(`/queue/:queue/send/:body`).get((req, resp) =>
+      {
+          const retentionPeriod: number = req.params.messageRetentionPeriod || this.Config.sqs.messageRetentionPeriod || 90;
+
+          this.Logger.info(`Send Message to Queue request received: Name ${req.params.queue}`);
+
+          this.createQueue(req.params.queue, { MessageRetentionPeriod: retentionPeriod.toString() })
+            .then((queueInfo) =>
+            {
+              this.publish(queueInfo, req.params.body)
+                .then((sendMessageResult) => resp.status(200).json(sendMessageResult))
+                .catch((err) => resp.status(400).json({error: err}));
+            })
+            .catch((err) =>
+            {
+              resp.status(400).json({error: err});
+            });
+      });
+
+      // Get the urls of all queues
+      router.route(`/queue`).get((req, resp) =>
+      {
+        this.listQueues(req.query.prefix)
+          .then((queues) =>
+          {
+            resp.status(200).json(queues);
+          })
+          .catch((err) =>
+          {
+            resp.status(400).json({error: err});
+          });
+      });
+
+      // Get the info of all queues
+      router.route(`/queue/info`).get((req, resp) =>
+      {
+        this.getAllInfo()
+            .then((queues) =>
+            {
+                resp.status(200).json(queues);
+            })
+            .catch((err) =>
+            {
+                resp.status(400).json({error: err});
+            });
+      });
+
+      // Get info about a queue
+      // There can be an optional query parameter named 'create', which if set to true, will create the queue.
+      // If there queue has already been created, then the QueueInfo aboutthe queue will be returned.
+      router.route(`/queue/:queue`)
+        .get((req, resp) =>
+        {
+            this.getQueueInfo(req.params.queue, req.query.create || false)
+                .then((queueInfo) =>
+                {
+                    resp.status(200).json(queueInfo);
+                })
+                .catch((err) =>
+                {
+                    resp.status(400).json({error: err});
+                });
+        })
+        // Delete a queue
+        .delete((req, resp) =>
+        {
+            this.Logger.info(`Delete Queue request received: Name ${req.params.queue}`);
+            const params = new SQSQueueInfo(req.params.queue, null, null);
+
+            this.deleteQueue(params)
+                .then((result) =>
+                {
+                    resp.status(200).json({status: result});
+                })
+                .catch((err) =>
+                {
+                    resp.status(400).json({error: err});
+                });
+        });
+
+      // Receive a message from a queue
+      router.route(`/queue/:queue/read`).get((req, resp) =>
+      {
+        this.getQueueInfo(req.params.queue, false)
+          .then((queueInfo) =>
+          {
+            this.receiveMessage(queueInfo, null,
+              (msg) =>
+              {
+                resp.status(200).json({ message: msg });
+              },
+              () =>
+              {
+                resp.status(200).json({ message: null });
+              },
+              (err) =>
+              {
+                  resp.status(500).json({ error: err });
+              });
+          })
+          .catch((err) =>
+          {
+            resp.status(400).json({error: err});
+          });
+      });
     }
 
     /**

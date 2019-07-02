@@ -6,7 +6,7 @@ import { AWSMessagingApiManager } from "./awsMessagingApiManager";
 import { AWSMessagingServerSettings, IAWSMessagingServerSettings } from "./awsMessagingServerSettings";
 import { AWSServiceEventPublisher } from "./awsServiceEventPublisher";
 import { ConfigurationManager } from "./configurationManager";
-import { IDisposable } from "./using";
+import { IDisposable } from "./framework/using";
 
 export class AWSMessagingServer implements IDisposable
 {
@@ -16,9 +16,9 @@ export class AWSMessagingServer implements IDisposable
     public Configuration: any;
 
     // Shortcuts for things thst the ApiManasger has
-    public get SQSClient(): SQSClient { return this.ApiManager.SQSClient; }
-    public get SNSClient(): SNSClient { return this.ApiManager.SNSClient; }
-    public get CloudwatchClient(): CloudwatchClient { return this.ApiManager.CloudwatchClient; }
+    public get SQSClient(): SQSClient { return this.ApiManager.getService<SQSClient>('SQS'); }
+    public get SNSClient(): SNSClient { return this.ApiManager.getService<SNSClient>('SNS'); }
+    public get CloudwatchClient(): CloudwatchClient { return this.ApiManager.getService<CloudwatchClient>('CloudWatch'); }
     public get AWSEvents(): AWSServiceEventPublisher { return this.ApiManager.EventPublisher; }
 
     public get App(): any { return this.ApiManager.Express; }

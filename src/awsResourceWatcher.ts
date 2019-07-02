@@ -1,5 +1,5 @@
 import { AWSServiceClient } from "./aws/awsServiceClient";
-import { IDisposable } from "./using";
+import { IDisposable } from "./framework/using";
 
 export /* singleton */ abstract class AWSResourceWatcher implements IDisposable
 {

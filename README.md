@@ -3,9 +3,8 @@
 
 This package provides a simple interface into the AWS-based messaging services, such as [*Simple Queue Service (SQS)*](https://aws.amazon.com/sqs/) and [*Simple Notification Service (SNS)*](https://aws.amazon.com/sns/).
 
-**If** RUN and IPM were hosted on AWS and they wanted to communicate with each other through messaging, then there are different ways to accomplish this. One is to use a Kafka running on an EC2 instance. Another way is to use a hosted version of Kafka (ie: Confluent). Yet another way is to use a combination of SQS, SNS and Kinesis.
+Let's say that you have two applications that were hosted on AWS and they wanted to communicate with each other through messaging. There are different ways to accomplish this. One is to use a Kafka running on an EC2 instance. Another way is to use a hosted version of Kafka (ie: Confluent). Yet another way is to use a combination of SQS, SNS and Kinesis.
 
-In the last case, this package can be used by Evo applications to perform inter-app communication aqnd notifications.
 
 ## Setting up the Environment
 ----

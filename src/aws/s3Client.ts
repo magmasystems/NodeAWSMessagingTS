@@ -1,5 +1,5 @@
 import { S3 } from "aws-sdk";
-import { IAWSMessagingServerSettings } from "../awsMessagingServerSettings";
+import express = require("express");
 import { IServiceCreationArgs } from "../services/serviceCreationArgs";
 import { AWSServiceClient } from "./awsServiceClient";
 
@@ -9,13 +9,8 @@ export class S3Client extends AWSServiceClient
 
     constructor(args: IServiceCreationArgs)
     {
-        super('S3', 'S3 Client', args.Settings);
-        this.S3Client = this.createClient();
-    }
-
-    private constructor2(settings?: IAWSMessagingServerSettings)
-    {
-        // super('S3', 'S3 Client', settings);
+        args.Name = 'S3';
+        super(args);
         this.S3Client = this.createClient();
     }
 
@@ -26,12 +21,21 @@ export class S3Client extends AWSServiceClient
 
     public getServiceConfiguration(): any
     {
-        return super.getServiceConfiguration().ses;
+        return super.getServiceConfiguration().s3;
     }
 
     private deleteClient(): void
     {
-        // There doesn't seem to be a dispose() function for the SES class
+        // There doesn't seem to be a dispose() function for the S3 class
+    }
+
+    public createApi(router: express.Router): void
+    {
+        super.createApi(router);
+
+        // let entity = this.getEntityName();
+        // router.route(`/${entity}/customers`).get((req, resp)     => this.getAllCustomers(req, resp));
+
     }
 
     public getAllInfo(): Promise<{}>

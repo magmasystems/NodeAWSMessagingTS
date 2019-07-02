@@ -7,10 +7,10 @@ import * as AWS from 'aws-sdk';
 import * as proxy from 'proxy-agent';
 import { AWSAuthenticatorFactory } from '../authentication/awsAuthenticatorFactory';
 import { AWSConfigurationManager } from '../awsConfigurationManager';
-import { AWSMessagingServerSettings, IAWSMessagingServerSettings } from '../awsMessagingServerSettings';
-import { IDisposable, using } from '../using';
+import { IAWSMessagingServerSettings } from '../awsMessagingServerSettings';
+import { IDisposable, using } from '../framework/using';
 
-export class SBSAWSClient implements IDisposable
+export class AWSClient implements IDisposable
 {
     public Name: string;
     public Configuration: any;

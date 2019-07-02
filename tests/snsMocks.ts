@@ -2,8 +2,8 @@ import * as AWS from 'aws-sdk';
 import * as AWSMock from 'aws-sdk-mock';
 import { EventEmitter } from 'events';
 import * as uuid from 'uuid';
+import { IDisposable } from '../src/framework/using';
 import { TSLogger } from '../src/logging/tslogger';
-import { IDisposable } from '../src/using';
 import { Queue } from './queue';
 
 export class TopicMessagePublishedEventEmitter extends EventEmitter {}
