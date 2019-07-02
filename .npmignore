@@ -1,0 +1,16 @@
+.vscode
+dist/app.js
+dist/tests
+node_modules
+tests
+.eslintignore
+.eslintrc.json
+.gitignore
+.jshintrc
+.npmignore
+app.ts
+jsconfig.json
+package-lock.json
+tsconfig.json
+tslint.json
+*.sh

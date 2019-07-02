@@ -1,0 +1,8 @@
+[2019-07-01T15:52:33.218] [INFO] aws-messaging - NodeAWSMessaging listening on port 3050!
+[2019-07-01T15:52:58.012] [INFO] SNS Client-2 - SNS Client disposed
+[2019-07-01T16:15:33.271] [INFO] aws-messaging - NodeAWSMessaging listening on port 3050!
+[2019-07-01T16:15:55.587] [INFO] SNS Client-2 - SNS Client disposed
+[2019-07-01T19:10:43.708] [INFO] aws-messaging - NodeAWSMessaging listening on port 3050!
+[2019-07-01T19:12:27.150] [INFO] S3 Client-1 - S3 Client disposed
+[2019-07-01T19:42:43.615] [INFO] aws-messaging - NodeAWSMessaging listening on port 3050!
+[2019-07-01T19:42:51.813] [INFO] S3 Client-1 - S3 Client disposed

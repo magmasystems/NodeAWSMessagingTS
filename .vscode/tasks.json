@@ -1,0 +1,84 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "typescript",
+            "tsconfig": "tsconfig.json",
+            "problemMatcher": [
+                "$tsc"
+            ]
+        },
+        {
+            "type": "npm",
+            "script": "publish",
+            "problemMatcher": []
+        },
+        {
+            "label": "mocha",
+            "type": "shell",
+            "command": "/usr/local/lib/node_modules/mocha/bin/mocha",
+            "args": [
+                "dist/tests/*.test.js"
+            ],
+            "problemMatcher": {
+                "owner": "mocha",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}"
+                ],
+                "pattern": [
+                    {
+                        "regexp": "^not\\sok\\s\\d+\\s(.*)$"
+                    },
+                    {
+                        "regexp": "\\s+(.*)$",
+                        "message": 1
+                    },
+                    {
+                        "regexp": "\\s+at\\s(.*)\\s\\((.*):(\\d+):(\\d+)\\)",
+                        "file": 2,
+                        "line": 3,
+                        "column": 4
+                    }
+                ],
+                "background": {
+                    "activeOnStart": false,
+                    "beginsPattern": {
+                        "regexp": "\\d+\\.\\.\\d+"
+                    },
+                    "endsPattern": {
+                        "regexp": "# fail \\d+"
+                    }
+                },
+                "applyTo": "allDocuments"
+            }
+        },
+        {
+            "type": "npm",
+            "script": "lint",
+            "problemMatcher": [
+                "$eslint-stylish"
+            ]
+        },
+        {
+            "type": "typescript",
+            "tsconfig": "tsconfig.json",
+            "option": "watch",
+            "problemMatcher": [
+                "$tsc-watch"
+            ]
+        },
+        {
+            "type": "npm",
+            "script": "unpublish",
+            "problemMatcher": []
+        },
+        {
+            "type": "npm",
+            "script": "patch",
+            "problemMatcher": []
+        }
+    ]
+}

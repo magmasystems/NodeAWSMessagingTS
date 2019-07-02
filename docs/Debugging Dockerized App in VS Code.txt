@@ -1,0 +1,56 @@
+In the Dockerfile, use the follow command:
+
+    CMD ["node", "--inspect=0.0.0.0:5858", "app.js"]
+
+or
+
+    CMD ["node", "--inspect-brk=0.0.0.0:5858", "app.js"]
+
+Add the following configuration to launch.json
+
+    {
+      "name": "Attach",
+      "type": "node",
+      "request": "attach",,
+      "protocol": "inspector"
+      "port": 5858,
+      "address": "localhost",
+      "restart": false,
+      "sourceMaps": false,
+      "outDir": null,
+      "localRoot": "${workspaceRoot}/",
+      "remoteRoot": "/usr/local/src/app/"
+    }
+
+Run the Docker container like this:
+
+    docker run -d -p 3050:3050 -p 5858:5858 sbsmessaging
+
+If you don't want the container running in the background, then leave out the -d    
+
+    docker run -p 3050:3050 -p 5858:5858 sbsmessaging
+
+
+Examine the Filesystem of an image
+  
+    docker run -it image_name sh
+
+
+To Examine the Contents of a Container’s File System after it Exits
+
+Start the container without the --rm flag
+
+    # create image (snapshot) from container filesystem 
+    docker commit <name of container> mysnapshot 
+
+    # explore this filesystem using bash
+    docker run -it mysnapshot bash
+
+    # remove the snapshot
+    docker rmi --force mysnapshot
+
+
+
+Articles:
+
+https://alexanderzeitler.com/articles/debugging-a-nodejs-es6-application-in-a-docker-container-using-visual-studio-code/
