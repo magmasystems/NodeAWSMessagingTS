@@ -24,32 +24,32 @@ Here is an example of an app.config.json file:
 {
   "sqs" :
   {
-    /* The region and the url for SQS */
+    // The region and the url for SQS 
     "region": "us-west-2",
     "serviceUrl": "http://sqs.us-west-2.amazonaws.com",
-    /* How long (in seconds) should a message be retained for (default = 120) */
+    // How long (in seconds) should a message be retained for (default = 120) 
     "messageRetentionPeriod": 90,
-    /* Number of seconds to wait for a message to appear. (default = 10) */
-    /* This is the concept of short-polling vs long-polling */
+    // Number of seconds to wait for a message to appear. (default = 10) 
+    // This is the concept of short-polling vs long-polling 
     "receiveWaitSeconds":  10,
-    /* Should the message be deleted form the queue after receiving it */
+    // Should the message be deleted form the queue after receiving it 
     "deleteMessageAfterConsuming":  false,
-    /* Additional attributes that will be passed to SQS's receiveMessage() function */
-    /* http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/SQS.html#receiveMessage-property */
+    // Additional attributes that will be passed to SQS's receiveMessage() function 
+    // http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/SQS.html#receiveMessage-property 
     "receiveAttributes":
     {
       "MaxNumberOfMessages": 30
     },
-    /* The interval (in seconds) at which we poll for changes in the topics. A value of -1 will turn off the watcher. */
+    // The interval (in seconds) at which we poll for changes in the topics. A value of -1 will turn off the watcher. 
     "infoWatcherInterval": 60
   },
 
   "sns" :
   {
-    /* The region and the url for SNS */
+    // The region and the url for SNS 
     "region": "us-west-2",
     "serviceUrl": "http://sns.us-west-2.amazonaws.com",
-    /* The interval (in seconds) at which we poll for changes in the topics. A value of -1 will turn off the watcher. */
+    // The interval (in seconds) at which we poll for changes in the topics. A value of -1 will turn off the watcher. 
     "infoWatcherInterval": -1
   },
 
@@ -58,16 +58,16 @@ Here is an example of an app.config.json file:
     "serviceUrl": "http://kinesis.us-west-2.amazonaws.com"
   },
 
-  /* application-specific settings (including the proxy settings for AWS) */
+  // application-specific settings (including the proxy settings for AWS) 
   "appSettings":
   {
-    /* The SBSMessagingService app needs to listen to a port. The default is 3000. */
+    // The MessagingService app needs to listen to a port. The default is 3000. 
     "serverPort":    3000,
-    /* This specifies the address of the proxy. You need this to get your app to connect to AWS. */
+    // This specifies the address of the proxy. You need this to get your app to connect to AWS. 
     "proxy":         "[The address of the proxy server]",
-    /* You can turn the proxy off if you are developing outside of the corporate network. Set proxyIgnore to true to ignore the proxy */
+    // You can turn the proxy off if you are developing outside of the corporate network. Set proxyIgnore to true to ignore the proxy 
     "proxyIgnore":   false,
-    /* Authentication information */
+    // Authentication information 
     "authentication":
     {
       "method": "iniFile",
@@ -83,7 +83,7 @@ It was stated above that the name of the configuration file was *app.config.json
 
 -env *xxx*
 
-where *xxx* is the name of the environment (ie: dev, qa, prod). When an environment is specified, SBSMessagingService will look for a configuration file named **app.config.*env*.json**. If it doesn't find a config file with that name, it will use the *app.config.json* file.
+where *xxx* is the name of the environment (ie: dev, qa, prod). When an environment is specified, MessagingService will look for a configuration file named **app.config.*env*.json**. If it doesn't find a config file with that name, it will use the *app.config.json* file.
 
 ## Programming the API
 ----
@@ -180,22 +180,22 @@ In addition to using the JavaScript API in your application, you can also use a 
 | Operation | URL | Method | Body |
 | --------- | --- | ------ | ---- |
 | **SQS** | | | |
-| Create a Queue named *queue* | `/sbsmessaging/queue/create` | POST | { "Name": *name* } |
-| Send a message *body* to a *queue*. The queue will be created if it doesn't exist. | `/sbsmessaging/queue/:queue/send/:body` | GET | |
-| Read a message from a *queue* | `/sbsmessaging/queue/:queue/read` | GET | |
-| Get the AWS Queue Urls of all of the queues. We can pass an optional prefix to match against. | `/sbsmessaging/queue/?:prefix` | GET | |
-| Get the resource information for all queues | `/sbsmessaging/queue/info` | GET | |
-| Get the resource information for a single *queue* | `/sbsmessaging/queue/:queue?:create` | GET | |
-| Delete a *queue* | `/sbsmessaging/queue/:queue` | DELETE | |
+| Create a Queue named *queue* | `/messaging/queue/create` | POST | { "Name": *name* } |
+| Send a message *body* to a *queue*. The queue will be created if it doesn't exist. | `/messaging/queue/:queue/send/:body` | GET | |
+| Read a message from a *queue* | `/messaging/queue/:queue/read` | GET | |
+| Get the AWS Queue Urls of all of the queues. We can pass an optional prefix to match against. | `/messaging/queue/?:prefix` | GET | |
+| Get the resource information for all queues | `/messaging/queue/info` | GET | |
+| Get the resource information for a single *queue* | `/messaging/queue/:queue?:create` | GET | |
+| Delete a *queue* | `/messaging/queue/:queue` | DELETE | |
 | **SNS** | | |
-| Create a Topic named *topic* | `/sbsmessaging/topic/create` | POST | { "Name": *name* } |
-| Publish a message *body* to a *topic*. The topic will be created if it doesn't exist. | `/sbsmessaging/topic/:topic/send/:body` | GET | |
-| Get the AWS Topic ARNs of all topics. | `/sbsmessaging/topic` | GET | |
-| Get the resource information for all topics | `/sbsmessaging/topic/info` | GET | |
-| Get the resource information for a single *topic* | `/sbsmessaging/topic/:topic?:create` | GET | |
-| Delete a *topic* | `/sbsmessaging/topic/:topic` | DELETE | |
-| Subscribe to a topic via a queue | `/sbsmessaging/topic/:topic/subscribe/:queue` | GET | |
-| Unsubscribe | `/sbsmessaging/topic/unsubscribe/:subscription` | GET | |
+| Create a Topic named *topic* | `/messaging/topic/create` | POST | { "Name": *name* } |
+| Publish a message *body* to a *topic*. The topic will be created if it doesn't exist. | `/messaging/topic/:topic/send/:body` | GET | |
+| Get the AWS Topic ARNs of all topics. | `/messaging/topic` | GET | |
+| Get the resource information for all topics | `/messaging/topic/info` | GET | |
+| Get the resource information for a single *topic* | `/messaging/topic/:topic?:create` | GET | |
+| Delete a *topic* | `/messaging/topic/:topic` | DELETE | |
+| Subscribe to a topic via a queue | `/messaging/topic/:topic/subscribe/:queue` | GET | |
+| Unsubscribe | `/messaging/topic/unsubscribe/:subscription` | GET | |
 
 ## Events
 
@@ -233,7 +233,7 @@ All events begin with the prefix **AWS**.
 
 ### WebSockets
 
-If you run the AWS Messaging application as a [PM2-hosted service](#the-sbsmessagingservice-application), then the events mentioned above will be broadcast through a WebSocket. If you write a client-side application that uses the AWS Messaging service, then you can subscribe to interesting events through the socket.
+If you run the AWS Messaging application as a [PM2-hosted service](#the-messagingservice-application), then the events mentioned above will be broadcast through a WebSocket. If you write a client-side application that uses the AWS Messaging service, then you can subscribe to interesting events through the socket.
 
 In the example below, we assume that we are connecting to a service running on your local machine on port 3050. When you subscribe, two event handlers will be set up. Subscribing to '*' (using rthe socketio-wildcard package) will subscribe to every event coming from the messaging service. You can also subscribe to a specific event and take some action when that event occurs.
 
@@ -278,7 +278,7 @@ The unit test files are in the ./tests directory, and all of the tests are named
   "type": "node",
   "program": "/usr/local/lib/node_modules/mocha/bin/_mocha",
   "stopOnEntry": false,
-  "args": ["dist/tests/*.test.js"],
+  "args": ["dist/tests//.test.js"],
   "cwd": "${workspaceFolder}",
   "runtimeExecutable": null,
   "env": { "NODE_ENV": "testing"}
@@ -289,24 +289,24 @@ The unit test files are in the ./tests directory, and all of the tests are named
 
 Each client (SQS, SNS) has a **Resource Watcher**. This watcher polls the SQS queues and SNS topics at fixed intervals, and will send events if there is another queue or topic added or deleted. (It currently does not detect changes in the attributes of an existing queue).
 
-## The SBSMessagingService Application
+## The MessagingService Application
 
-There is an application that will instatiate an SBS AWS Messaging class and will listen to a port for REST requests. This application is called **SBSMessagingService**. You can run this as a standlone application from a Terminal, or you can run it as a service using the **pm2** utility.
+There is an application that will instatiate an  AWS Messaging class and will listen to a port for REST requests. This application is called **MessagingService**. You can run this as a standlone application from a Terminal, or you can run it as a service using the **pm2** utility.
 
 To run the application as a standlone executable:
 
-    cd SBSMessagingService
+    cd MessagingService
     node server.js
 
 To run the application as a service:
 
-    cd SBSMessagingService
+    cd MessagingService
     pm2 start pm2.config.js
 
 If you want to stop the service:
 
-    pm2 stop SBSMessagingService
+    pm2 stop MessagingService
 
 If you want to delete the service from the list of running services that pm2 manages:
 
-    pm2 delete SBSMessagingService
+    pm2 delete MessagingService
