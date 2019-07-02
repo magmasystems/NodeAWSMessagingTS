@@ -84,6 +84,11 @@ It was stated above that the name of the configuration file was *app.config.json
 
 where *xxx* is the name of the environment (ie: dev, qa, prod). When an environment is specified, MessagingService will look for a configuration file named **app.config.*env*.json**. If it doesn't find a config file with that name, it will use the *app.config.json* file.
 
+## Swagger Docuumentation
+----
+
+We use the express-oas-generator package to automatically generate the Swagger (OpenAPI) documentation for the APIs. To view the documentation, in your browser, navigate to http://localhost:[port]/api-docs, where `port` is the port that the Node AWS Messaging server is running on.
+
 ## Programming the API
 ----
 

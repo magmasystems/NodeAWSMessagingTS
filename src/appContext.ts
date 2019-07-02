@@ -4,7 +4,7 @@ export class AppContext
 {
     public static IsMocking: boolean;
 
-    private static appName: string = 'node-aws-messaging';
+    private static appName: string = 'awsmessaging';
 
     public static RestApiPrefix: string    = `/${AppContext.appName}`;
     public static RestSQSApiPrefix: string = `/awsmessaging/sqs`;

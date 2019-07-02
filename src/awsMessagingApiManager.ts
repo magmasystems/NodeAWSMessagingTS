@@ -4,8 +4,6 @@ import * as express from 'express';
 import { Router } from 'express';
 import { AppContext } from './appContext';
 import { AWSServiceClient } from './aws/awsServiceClient';
-import { SNSTopicInfo } from './aws/snsClient';
-import { SQSQueueInfo } from './aws/sqsClient';
 import { IAWSMessagingServerSettings } from './awsMessagingServerSettings';
 import { AWSServiceEventPublisher } from './awsServiceEventPublisher';
 import { ConfigurationManager } from './configurationManager';

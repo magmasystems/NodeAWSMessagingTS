@@ -6,8 +6,8 @@ import { AWSResourceInfoBase } from "../awsResourceInfoBase";
 import { AWSResourceWatcher } from "../awsResourceWatcher";
 import { IServiceCreationArgs } from "../services/serviceCreationArgs";
 import { AWSServiceClient } from "./awsServiceClient";
-import { SNSTopicInfo, SNSClient } from "./snsClient";
-import { SQSQueueInfo, SQSClient } from "./sqsClient";
+import { SNSClient, SNSTopicInfo } from "./snsClient";
+import { SQSClient, SQSQueueInfo } from "./sqsClient";
 
 /**
  * CloudwatchAlarmInfo
@@ -46,7 +46,6 @@ export class CloudwatchClient extends AWSServiceClient {
         super(args);
 
         this.InternalClient = this.createClient();
-
         this.initAlarmMap(undefined);
     }
 
@@ -83,54 +82,22 @@ export class CloudwatchClient extends AWSServiceClient {
         const entity = 'alarm';
 
         // Get the urls of all alarms
-        router.route(`/${entity}`).get((_, resp) => {
-            this.listCloudwatchAlarms()
-                .then((alarms) => {
-                    const alarmArns = [];
-                    // tslint:disable-next-line:forin
-                    for (const alarm in CloudwatchClient.CWAlarmMap) {
-                        const info: CloudwatchAlarmInfo = CloudwatchClient.CWAlarmMap[alarm];
-                        alarmArns.push({ Arn: info.Arn });
-                    }
-                    resp.status(200).json({ Alarms: alarmArns });
-                })
-                .catch((err) => {
-                    resp.status(400).json({ error: err });
-                });
-        });
+        router.route(`/${entity}`).get((_, resp) => this.apiGetAllAlarmUrls(_, resp));
 
         // Get the info of all alarms
-        router.route(`/${entity}/info`).get((_, resp) => {
-            this.getAllInfo()
-                .then((alarms) => { resp.status(200).json(alarms); })
-                .catch((err) => { resp.status(400).json({ error: err }); });
-        });
+        router.route(`/${entity}/info`).get((_, resp) => this.apiGetAllAlarmInfo(_, resp));
 
         // Create an alarm for a queue and a metric
-        router.route(`/${entity}/create`).post((req, resp) => {
-            this.createAlarmForQueue(req, resp);
-        });
+        router.route(`/${entity}/create`).post((req, resp) => this.apiCreateAlarm(req, resp));
 
         // Get info about an alarm
         router.route(`/${entity}/:alarmName`)
-            .get((req, resp) => {
-                this.listCloudwatchAlarms(req.params.alarmName)
-                    .then((result) => resp.status(200).json(result.MetricAlarms[0]))
-                    .catch((err) => resp.status(400).json({ error: err }));
-            })
+            .get((req, resp) => this.apiGetAlarmInfo(req, resp))
             // Delete an alarm
-            .delete((req, resp) => {
-                this.deleteAlarm(req.params.alarmName)
-                    .then((result) => resp.status(200).json({ status: result }))
-                    .catch((err) => resp.status(400).json({ error: err }));
-            });
+            .delete((req, resp) => this.apiDeleteAlarm(req, resp));
 
         // Set the alarm for testing
-        router.route(`/${entity}/:alarmName/set`).put((req, resp) => {
-            this.setAlarmState(req.params.alarmName, req.body.state, req.body.reason)
-                .then((result) => resp.status(200).json({ status: result }))
-                .catch((err) => resp.status(500).json({ error: err }));
-        });
+        router.route(`/${entity}/:alarmName/set`).put((req, resp) => this.apiSetAlarm(req, resp));
     }
 
     public swapInfoMap(newMap: {}, fireChangeEvent: boolean = false): void {
@@ -141,6 +108,54 @@ export class CloudwatchClient extends AWSServiceClient {
     public getCurrentInfoMap(): {} {
         return CloudwatchClient.CWAlarmMap;
     }
+
+    //#region API Functions
+    private apiCreateAlarm(req, resp): void
+    {
+        this.createAlarmForQueue(req, resp);
+    }
+
+    private apiDeleteAlarm(req, resp): void {
+        this.deleteAlarm(req.params.alarmName)
+            .then((result) => resp.status(200).json({ status: result }))
+            .catch((err) => resp.status(400).json({ error: err }));
+    }
+
+    private apiGetAllAlarmUrls(req, resp): void {
+        this.listCloudwatchAlarms()
+            .then((alarms) => {
+                const alarmArns = [];
+                // tslint:disable-next-line:forin
+                for (const alarm in CloudwatchClient.CWAlarmMap) {
+                    const info: CloudwatchAlarmInfo = CloudwatchClient.CWAlarmMap[alarm];
+                    alarmArns.push({ Arn: info.Arn });
+                }
+                resp.status(200).json({ Alarms: alarmArns });
+            })
+            .catch((err) => {
+                resp.status(400).json({ error: err });
+            });
+    }
+
+    private apiGetAlarmInfo(req, resp): void
+    {
+        this.listCloudwatchAlarms(req.params.alarmName)
+            .then((result) => resp.status(200).json(result.MetricAlarms[0]))
+            .catch((err) => resp.status(400).json({ error: err }));
+    }
+
+    private apiGetAllAlarmInfo(req, resp): void {
+        this.getAllInfo()
+            .then((alarms) => { resp.status(200).json(alarms); })
+            .catch((err) => { resp.status(400).json({ error: err }); });
+    }
+
+    private apiSetAlarm(req, resp): void {
+        this.setAlarmState(req.params.alarmName, req.body.state, req.body.reason)
+            .then((result) => resp.status(200).json({ status: result }))
+            .catch((err) => resp.status(500).json({ error: err }));
+    }
+    //#endregion
 
     /**
      * getAllInfo

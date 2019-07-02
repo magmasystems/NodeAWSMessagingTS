@@ -10,10 +10,8 @@ import { AWSResourceInfoBase } from '../awsResourceInfoBase';
 import { AWSResourceWatcher } from '../awsResourceWatcher';
 import { AWSServiceClient } from './awsServiceClient';
 
-import * as AWSMock from 'aws-sdk-mock';
 import { AWSError } from 'aws-sdk/lib/error';
 import express = require('express');
-import { IAWSMessagingServerSettings } from '../awsMessagingServerSettings';
 import { IServiceCreationArgs } from '../services/serviceCreationArgs';
 
 export type MessageReceivedCallback = (msg: SQS.Message) => void;
@@ -26,10 +24,8 @@ export type ErrorReceivedCallback = (err: AWSError) => void;
  * @export
  * @class SQSQueueInfo
  */
-export class SQSQueueInfo extends AWSResourceInfoBase
-{
-    constructor(name: string, url?: string, arn?: string, attributes: any = {})
-    {
+export class SQSQueueInfo extends AWSResourceInfoBase {
+    constructor(name: string, url?: string, arn?: string, attributes: any = {}) {
         super("Queue", name, arn, attributes);
         this.Url = url;
 
@@ -44,16 +40,14 @@ export class SQSQueueInfo extends AWSResourceInfoBase
  * @class SQSClient
  * @extends {AWSServiceClient}
  */
-export class SQSClient extends AWSServiceClient
-{
+export class SQSClient extends AWSServiceClient {
     public static QueueMap: {};
     public static ResourceWatcher: SQSResourceWatcher;
 
     private InternalClient: SQS;
     private DeleteMessageAfterConsuming: boolean;
 
-    constructor(args: IServiceCreationArgs)
-    {
+    constructor(args: IServiceCreationArgs) {
         args.Name = 'SQS';
         super(args);
 
@@ -65,14 +59,11 @@ export class SQSClient extends AWSServiceClient
         this.initQueueMap(undefined);
     }
 
-    private initQueueMap(attrs?: any)
-    {
-        if (!SQSClient.QueueMap)
-        {
+    private initQueueMap(attrs?: any) {
+        if (!SQSClient.QueueMap) {
             SQSClient.QueueMap = {};
 
-            if (!attrs || !attrs.noPreloadInfo)
-            {
+            if (!attrs || !attrs.noPreloadInfo) {
                 this.getAllInfo()
                     .then((queueMap) => this.swapInfoMap(queueMap))
                     .catch((err) => this.Logger.error(err));
@@ -82,162 +73,54 @@ export class SQSClient extends AWSServiceClient
         }
     }
 
-    private createClient(): SQS
-    {
-        if (AppContext.IsMocking)
-        {
+    private createClient(): SQS {
+        if (AppContext.IsMocking) {
             return new AWS.SQS();
         }
-        else
-        {
+        else {
             return new SQS({ region: this.AWSClient.Configuration.sqs.region, apiVersion: '2012-11-05' });
         }
     }
 
-    private sleep(ms): Promise<number>
-    {
+    private sleep(ms): Promise<number> {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
-    public getServiceConfiguration(): any
-    {
+    public getServiceConfiguration(): any {
         return super.getServiceConfiguration().sqs;
     }
 
-    private deleteClient(): void
-    {
+    private deleteClient(): void {
         // There doesn't seem to be a dispose() function for the SQS class
     }
 
-    public createAPIs(router: express.Router): void
-    {
-      // Create a Queue
-      router.route(`/queue/create`).post((req, resp) =>
-      {
-        const queueName: string = req.body.Name;
+    public createApi(router: express.Router): void {
+        super.createApi(router);
 
-        // Get the attributes
-        const attrs = req.body || {};
+        const entity = 'queue';
 
-        this.Logger.info(`Create Queue request received: Name ${queueName}`);
+        // Create a Queue
+        router.route(`/${entity}/create`).post((req, resp) => this.apiCreateQueue(req, resp));
 
-        this.createQueue(queueName, attrs)
-          .then((queueInfo) =>
-          {
-              resp.status(201).json(queueInfo);
-          })
-          .catch((err) =>
-          {
-              resp.status(400).json({error: err});
-          });
-      });
+        // Maybe create a Queue and send a message
+        router.route(`/${entity}/:queue/send/:body`).get((req, resp) => this.apiSendMessage(req, resp));
 
-      // Maybe create a Queue and send a message
-      router.route(`/queue/:queue/send/:body`).get((req, resp) =>
-      {
-          const retentionPeriod: number = req.params.messageRetentionPeriod || this.Config.sqs.messageRetentionPeriod || 90;
+        // Get the urls of all queues
+        router.route(`/${entity}`).get((req, resp) => this.apiGetQueueUrls(req, resp));
 
-          this.Logger.info(`Send Message to Queue request received: Name ${req.params.queue}`);
+        // Get the info of all queues
+        router.route(`/${entity}/info`).get((req, resp) => this.apiGetAllQueueInfo(req, resp));
 
-          this.createQueue(req.params.queue, { MessageRetentionPeriod: retentionPeriod.toString() })
-            .then((queueInfo) =>
-            {
-              this.publish(queueInfo, req.params.body)
-                .then((sendMessageResult) => resp.status(200).json(sendMessageResult))
-                .catch((err) => resp.status(400).json({error: err}));
-            })
-            .catch((err) =>
-            {
-              resp.status(400).json({error: err});
-            });
-      });
+        // Get info about a queue
+        // There can be an optional query parameter named 'create', which if set to true, will create the queue.
+        // If there queue has already been created, then the QueueInfo aboutthe queue will be returned.
+        router.route(`/${entity}/:queue`)
+            .get((req, resp) => this.apiGetQueueInfo(req, resp))
+            // Delete a queue
+            .delete((req, resp) => this.apiDeleteQueue(req, resp));
 
-      // Get the urls of all queues
-      router.route(`/queue`).get((req, resp) =>
-      {
-        this.listQueues(req.query.prefix)
-          .then((queues) =>
-          {
-            resp.status(200).json(queues);
-          })
-          .catch((err) =>
-          {
-            resp.status(400).json({error: err});
-          });
-      });
-
-      // Get the info of all queues
-      router.route(`/queue/info`).get((req, resp) =>
-      {
-        this.getAllInfo()
-            .then((queues) =>
-            {
-                resp.status(200).json(queues);
-            })
-            .catch((err) =>
-            {
-                resp.status(400).json({error: err});
-            });
-      });
-
-      // Get info about a queue
-      // There can be an optional query parameter named 'create', which if set to true, will create the queue.
-      // If there queue has already been created, then the QueueInfo aboutthe queue will be returned.
-      router.route(`/queue/:queue`)
-        .get((req, resp) =>
-        {
-            this.getQueueInfo(req.params.queue, req.query.create || false)
-                .then((queueInfo) =>
-                {
-                    resp.status(200).json(queueInfo);
-                })
-                .catch((err) =>
-                {
-                    resp.status(400).json({error: err});
-                });
-        })
-        // Delete a queue
-        .delete((req, resp) =>
-        {
-            this.Logger.info(`Delete Queue request received: Name ${req.params.queue}`);
-            const params = new SQSQueueInfo(req.params.queue, null, null);
-
-            this.deleteQueue(params)
-                .then((result) =>
-                {
-                    resp.status(200).json({status: result});
-                })
-                .catch((err) =>
-                {
-                    resp.status(400).json({error: err});
-                });
-        });
-
-      // Receive a message from a queue
-      router.route(`/queue/:queue/read`).get((req, resp) =>
-      {
-        this.getQueueInfo(req.params.queue, false)
-          .then((queueInfo) =>
-          {
-            this.receiveMessage(queueInfo, null,
-              (msg) =>
-              {
-                resp.status(200).json({ message: msg });
-              },
-              () =>
-              {
-                resp.status(200).json({ message: null });
-              },
-              (err) =>
-              {
-                  resp.status(500).json({ error: err });
-              });
-          })
-          .catch((err) =>
-          {
-            resp.status(400).json({error: err});
-          });
-      });
+        // Receive a message from a queue
+        router.route(`/${entity}/:queue/read`).get((req, resp) => this.apiQueueReceiveMessage(req, resp));
     }
 
     /**
@@ -246,14 +129,11 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<any>}
      * @memberof SQSClient
      */
-    public async getAllInfo(): Promise<{}>
-    {
+    public async getAllInfo(): Promise<{}> {
         const listOfQueues = await this.listQueues();
 
-        return new Promise((resolve, reject) =>
-        {
-            if (!listOfQueues || !listOfQueues.QueueUrls)
-            {
+        return new Promise((resolve, reject) => {
+            if (!listOfQueues || !listOfQueues.QueueUrls) {
                 resolve(null);
                 return;
             }
@@ -262,17 +142,13 @@ export class SQSClient extends AWSServiceClient
             const queueMap = {};
 
             // tslint:disable-next-line:prefer-for-of
-            for (let i = 0;  i <  listOfQueues.QueueUrls.length;  i++)
-            {
+            for (let i = 0; i < listOfQueues.QueueUrls.length; i++) {
                 const url: string = listOfQueues.QueueUrls[i];
-                promises.push(this.InternalClient.getQueueAttributes( { QueueUrl: url, AttributeNames: [ "All" ] }, (err, result) =>
-                {
-                    if (err)
-                    {
+                promises.push(this.InternalClient.getQueueAttributes({ QueueUrl: url, AttributeNames: ["All"] }, (err, result) => {
+                    if (err) {
                         this.Logger.error(err);
                     }
-                    else
-                    {
+                    else {
                         const arn: string = result.Attributes.QueueArn;
                         const queueName: string = this.extractNameFromArn(arn);
                         queueMap[queueName] = new SQSQueueInfo(queueName, url, arn, result.Attributes);
@@ -283,8 +159,7 @@ export class SQSClient extends AWSServiceClient
             // Wait for all of the queue attribute requests to be completed.
             // Then set the global QueueMap.
             Promise.all(promises)
-                .then((q) =>
-                {
+                .then((q) => {
                     resolve(queueMap);
                 })
                 .catch((err) => this.Logger.error(err));
@@ -302,19 +177,109 @@ export class SQSClient extends AWSServiceClient
      * @param {boolean} [fireChangeEvent=false]
      * @memberof SQSClient
      */
-    public swapInfoMap(newMap: {}, fireChangeEvent: boolean = false)
-    {
-        if (newMap)
-        {
+    public swapInfoMap(newMap: {}, fireChangeEvent: boolean = false) {
+        if (newMap) {
             SQSClient.QueueMap = newMap;
             super.swapInfoMap(newMap, fireChangeEvent);
         }
     }
 
-    public getCurrentInfoMap(): {}
-    {
+    public getCurrentInfoMap(): {} {
         return SQSClient.QueueMap;
     }
+
+    //#region API Functions
+    private apiCreateQueue(req, resp): void {
+        const queueName: string = req.body.Name;
+
+        // Get the attributes
+        const attrs = req.body || {};
+
+        this.Logger.info(`Create Queue request received: Name ${queueName}`);
+
+        this.createQueue(queueName, attrs)
+            .then((queueInfo) => {
+                resp.status(201).json(queueInfo);
+            })
+            .catch((err) => {
+                resp.status(400).json({ error: err });
+            });
+    }
+
+    private apiSendMessage(req, resp): void {
+        const retentionPeriod: number = req.params.messageRetentionPeriod || this.Config.sqs.messageRetentionPeriod || 90;
+
+        this.Logger.info(`Send Message to Queue request received: Name ${req.params.queue}`);
+
+        this.createQueue(req.params.queue, { MessageRetentionPeriod: retentionPeriod.toString() })
+            .then((queueInfo) => {
+                this.publish(queueInfo, req.params.body)
+                    .then((sendMessageResult) => resp.status(200).json(sendMessageResult))
+                    .catch((err) => resp.status(400).json({ error: err }));
+            })
+            .catch((err) => {
+                resp.status(400).json({ error: err });
+            });
+    }
+
+    private apiGetQueueUrls(req, resp): void {
+        this.listQueues(req.query.prefix)
+            .then((queues) => {
+                resp.status(200).json(queues);
+            })
+            .catch((err) => {
+                resp.status(400).json({ error: err });
+            });
+    }
+
+    private apiGetQueueInfo(req, resp): void {
+        this.getQueueInfo(req.params.queue, req.query.create || false)
+            .then((queueInfo) => {
+                resp.status(200).json(queueInfo);
+            })
+            .catch((err) => {
+                resp.status(400).json({ error: err });
+            });
+    }
+
+    private apiGetAllQueueInfo(req, resp): void {
+        this.getAllInfo()
+            .then((queues) => {
+                resp.status(200).json(queues);
+            })
+            .catch((err) => {
+                resp.status(400).json({ error: err });
+            });
+    }
+
+    private apiQueueReceiveMessage(req, resp): void {
+        this.getQueueInfo(req.params.queue, false)
+            .then((queueInfo) => {
+                this.receiveMessage(queueInfo, null,
+                    (msg) => {
+                        resp.status(200).json({ message: msg });
+                    },
+                    () => {
+                        resp.status(200).json({ message: null });
+                    },
+                    (err) => {
+                        resp.status(500).json({ error: err });
+                    });
+            })
+            .catch((err) => {
+                resp.status(400).json({ error: err });
+            });
+    }
+
+    private apiDeleteQueue(req, resp): void {
+        this.Logger.info(`Delete Queue request received: Name ${req.params.queue}`);
+        const params = new SQSQueueInfo(req.params.queue, null, null);
+
+        this.deleteQueue(params)
+            .then((result) => { resp.status(200).json({ status: result }); })
+            .catch((err) => { resp.status(400).json({ error: err }); });
+    }
+    //#endregion
 
     /**
      * createQueues
@@ -323,12 +288,10 @@ export class SQSClient extends AWSServiceClient
      * @returns {Array<Promise<SQSQueueInfo>>}
      * @memberof SQSClient
      */
-    public createQueues(queueNames: string[]): Array<Promise<SQSQueueInfo>>
-    {
+    public createQueues(queueNames: string[]): Array<Promise<SQSQueueInfo>> {
         const promises: Array<Promise<SQSQueueInfo>> = [];
 
-        for (const queueName of queueNames)
-        {
+        for (const queueName of queueNames) {
             promises.push(this.createQueue(queueName));
         }
 
@@ -344,22 +307,18 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<SQSQueueInfo>}
      * @memberof SQSClient
      */
-    public createQueue(queueName: string, attrs: any = {}, allowQueueToReceiveMessages: boolean = true): Promise<SQSQueueInfo>
-    {
+    public createQueue(queueName: string, attrs: any = {}, allowQueueToReceiveMessages: boolean = true): Promise<SQSQueueInfo> {
         // If we created the queue already, then just return this queue
-        if (SQSClient.QueueMap[queueName] !== undefined)
-        {
+        if (SQSClient.QueueMap[queueName] !== undefined) {
             return new Promise((resolve, _) => resolve(SQSClient.QueueMap[queueName]));
         }
 
         // If we haven't explicitly passed in some attributes, then look for them in the config file
         const config = this.AWSClient.Configuration.sqs;
-        if (!attrs.MessageRetentionPeriod)
-        {
+        if (!attrs.MessageRetentionPeriod) {
             attrs.MessageRetentionPeriod = (config.messageRetentionPeriod || 120).toString();
         }
-        if (!attrs.ReceiveMessageWaitTimeSeconds)
-        {
+        if (!attrs.ReceiveMessageWaitTimeSeconds) {
             attrs.ReceiveMessageWaitTimeSeconds = (config.receiveWaitSeconds || 10).toString();
         }
 
@@ -371,54 +330,43 @@ export class SQSClient extends AWSServiceClient
 
         // Add any attributes that were passed in
         // tslint:disable-next-line:forin
-        for (const key in attrs)
-        {
-            if (key !== "Name")
-            {
+        for (const key in attrs) {
+            if (key !== "Name") {
                 let val = attrs[key];
-                if (typeof val === 'number')
-                {
+                if (typeof val === 'number') {
                     val = val.toString();
                 }
                 createQueueRequest.Attributes[key] = val;
             }
         }
 
-        return new Promise((resolve, reject) =>
-        {
-            this.InternalClient.createQueue(createQueueRequest, (err, queueResp) =>
-            {
-                if (err)
-                {
+        return new Promise((resolve, reject) => {
+            this.InternalClient.createQueue(createQueueRequest, (err, queueResp) => {
+                if (err) {
                     this.Logger.error(err);
                     reject(err);
                 }
-                else
-                {
+                else {
                     const queueAttributesRequest =
                     {
-                        AttributeNames: [ 'All' ],
+                        AttributeNames: ['All'],
                         QueueUrl: queueResp.QueueUrl,
                     };
-                    this.InternalClient.getQueueAttributes(queueAttributesRequest, (err2, result) =>
-                    {
+                    this.InternalClient.getQueueAttributes(queueAttributesRequest, (err2, result) => {
                         // tslint:disable-next-line:max-line-length
                         const queueInfo = new SQSQueueInfo(queueName, queueResp.QueueUrl, result.Attributes.QueueArn, result.Attributes);
                         SQSClient.QueueMap[queueName] = queueInfo;
 
                         // We need to tell AWS that the queue should be allowed to receive messages
-                        if (allowQueueToReceiveMessages)
-                        {
+                        if (allowQueueToReceiveMessages) {
                             this.sqsAllowQueueToReceiveMessages(queueInfo)
-                                .then(() =>
-                                {
+                                .then(() => {
                                     this.Logger.info(`The queue was created: ${queueInfo}`);
                                     resolve(queueInfo);
                                     this.EventPublisher.emit('Queue.Created', queueInfo.Name);
                                 });
                         }
-                        else
-                        {
+                        else {
                             this.Logger.info(`The queue was created: ${queueInfo}`);
                             resolve(queueInfo);
                             this.EventPublisher.emit('Queue.Created', queueInfo.Name);
@@ -430,8 +378,7 @@ export class SQSClient extends AWSServiceClient
     }
 
     /* private */
-    private sqsAllowQueueToReceiveMessages(queueInfo: SQSQueueInfo): Promise<{}>
-    {
+    private sqsAllowQueueToReceiveMessages(queueInfo: SQSQueueInfo): Promise<{}> {
         let attr = `{
           "Version": "2012-10-17",
           "Id": "{queueArn}/SQSDefaultPolicy",
@@ -447,22 +394,18 @@ export class SQSClient extends AWSServiceClient
 
         attr = attr.replace(/{queueArn}/g, queueInfo.Arn);
 
-        return new Promise((resolve, reject) =>
-        {
+        return new Promise((resolve, reject) => {
             this.InternalClient.setQueueAttributes(
                 {
                     Attributes: { Policy: attr },
                     QueueUrl: queueInfo.Url,
                 },
-                (err, result) =>
-                {
-                    if (err)
-                    {
+                (err, result) => {
+                    if (err) {
                         this.Logger.error(err);
                         reject(err);
                     }
-                    else
-                    {
+                    else {
                         resolve(result);
                     }
                 },
@@ -478,25 +421,20 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<SQSQueueInfo>}
      * @memberof SQSClient
      */
-    public getQueueInfo(queueName: string, createQueueIfNoExist: boolean = true): Promise<SQSQueueInfo>
-    {
-        if (SQSClient.QueueMap[queueName] !== undefined)
-        {
+    public getQueueInfo(queueName: string, createQueueIfNoExist: boolean = true): Promise<SQSQueueInfo> {
+        if (SQSClient.QueueMap[queueName] !== undefined) {
             return new Promise((resolve, _) => resolve(SQSClient.QueueMap[queueName]));
         }
 
-        if (!createQueueIfNoExist)
-        {
+        if (!createQueueIfNoExist) {
             return new Promise((resolve, _) => resolve(null));
         }
 
-        return new Promise((resolve, reject) =>
-        {
+        return new Promise((resolve, reject) => {
             let queueInfo = null;
 
             this.createQueue(queueName)
-                .then(() =>
-                {
+                .then(() => {
                     queueInfo = SQSClient.QueueMap[queueName];
                     if (queueInfo == null) {
                         reject(null);
@@ -515,21 +453,16 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<SQS.ListQueuesResult>} a list of strings, each one is a URL of a SQS Queue
      * @memberof SQSClient
      */
-    public listQueues(prefix: string = null): Promise<SQS.ListQueuesResult>
-    {
+    public listQueues(prefix: string = null): Promise<SQS.ListQueuesResult> {
         const params = (prefix) ? { QueueNamePrefix: prefix } : {};
 
-        return new Promise((resolve, reject) =>
-        {
-            this.InternalClient.listQueues(params, (err, result) =>
-            {
-                if (err)
-                {
+        return new Promise((resolve, reject) => {
+            this.InternalClient.listQueues(params, (err, result) => {
+                if (err) {
                     this.Logger.error(err);
                     reject(err);
                 }
-                else
-                {
+                else {
                     resolve(result);
                 }
             });
@@ -543,28 +476,22 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<{}>}
      * @memberof SQSClient
      */
-    public deleteQueue(queueInfo: SQSQueueInfo): Promise<boolean>
-    {
-        return new Promise((resolve, reject) =>
-        {
+    public deleteQueue(queueInfo: SQSQueueInfo): Promise<boolean> {
+        return new Promise((resolve, reject) => {
             const queueInfo2 = SQSClient.QueueMap[queueInfo.Name];
-            if (!queueInfo2 || !queueInfo2.Name)
-            {
+            if (!queueInfo2 || !queueInfo2.Name) {
                 const errMsg = `There is no queue named ${queueInfo.Name}`;
                 this.Logger.error(errMsg);
                 reject(errMsg);
                 return;
             }
 
-            this.InternalClient.deleteQueue({ QueueUrl: queueInfo2.Url }, (err, result) =>
-            {
-                if (err)
-                {
+            this.InternalClient.deleteQueue({ QueueUrl: queueInfo2.Url }, (err, result) => {
+                if (err) {
                     this.Logger.error(err);
                     reject(err);
                 }
-                else
-                {
+                else {
                     delete SQSClient.QueueMap[queueInfo2.Name];
                     this.Logger.info(`The queue ${queueInfo2.Name} was deleted`);
                     resolve(true);
@@ -581,26 +508,20 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<{}>}
      * @memberof SQSClient
      */
-    public purgeQueue(queueInfo: SQSQueueInfo): Promise<{}>
-    {
-        return new Promise((resolve, reject) =>
-        {
+    public purgeQueue(queueInfo: SQSQueueInfo): Promise<{}> {
+        return new Promise((resolve, reject) => {
             const queueInfo2 = SQSClient.QueueMap[queueInfo.Name];
-            if (!queueInfo2)
-            {
+            if (!queueInfo2) {
                 reject(`There is no queue named ${queueInfo.Name}`);
                 return;
             }
 
-            this.InternalClient.purgeQueue({ QueueUrl: queueInfo.Url }, (err, result) =>
-            {
-                if (err)
-                {
+            this.InternalClient.purgeQueue({ QueueUrl: queueInfo.Url }, (err, result) => {
+                if (err) {
                     this.Logger.error(err);
                     reject(err);
                 }
-                else
-                {
+                else {
                     resolve(result);
                     this.EventPublisher.emit('Queue.Purged', queueInfo.Name);
                 }
@@ -616,24 +537,19 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<SQS.SendMessageResult>}
      * @memberof SQSClient
      */
-    public publish(queueInfo: SQSQueueInfo, body: string): Promise<SQS.SendMessageResult>
-    {
-        return new Promise((resolve, reject) =>
-        {
+    public publish(queueInfo: SQSQueueInfo, body: string): Promise<SQS.SendMessageResult> {
+        return new Promise((resolve, reject) => {
             this.InternalClient.sendMessage(
                 {
                     MessageBody: body,
                     QueueUrl: queueInfo.Url,
                 },
-                (err, result) =>
-                {
-                    if (err)
-                    {
+                (err, result) => {
+                    if (err) {
                         this.Logger.error(err);
                         reject(err);
                     }
-                    else
-                    {
+                    else {
                         resolve(result);
                     }
                 });
@@ -653,8 +569,7 @@ export class SQSClient extends AWSServiceClient
                           attrs: {} = null,
                           onMsgReceived: MessageReceivedCallback = null,
                           onNoMsgReceived: NoMessageReceivedCallback = null,
-                          onError: ErrorReceivedCallback = null): void
-    {
+                          onError: ErrorReceivedCallback = null): void {
         /*
             var params =
             {
@@ -682,16 +597,13 @@ export class SQSClient extends AWSServiceClient
             QueueUrl: queueInfo.Url,
         };
 
-        if (attrs == null)
-        {
+        if (attrs == null) {
             attrs = this.AWSClient.Configuration.sqs.receiveAttributes;
         }
 
         // tslint:disable-next-line:forin
-        for (const attr in attrs)
-        {
-            switch (attr.toLowerCase())
-            {
+        for (const attr in attrs) {
+            switch (attr.toLowerCase()) {
                 case "maxnumberofmessages":
                     request.MaxNumberOfMessages = parseInt(attrs[attr], 10);
                     break;
@@ -707,48 +619,38 @@ export class SQSClient extends AWSServiceClient
             }
         }
 
-        this.InternalClient.receiveMessage(request, (err, result) =>
-        {
-            if (!result)
-            {
-                if (err)
-                {
+        this.InternalClient.receiveMessage(request, (err, result) => {
+            if (!result) {
+                if (err) {
                     this.Logger.error(err);
-                    if (onError)
-                    {
+                    if (onError) {
                         onError(err);
                         return;
                     }
                 }
-                if (onNoMsgReceived)
-                {
+                if (onNoMsgReceived) {
                     onNoMsgReceived();
                 }
                 return;
             }
 
             const msgs = result.Messages;
-            if (!msgs || msgs.length === 0)
-            {
-                if (onNoMsgReceived)
-                {
+            if (!msgs || msgs.length === 0) {
+                if (onNoMsgReceived) {
                     onNoMsgReceived();
                 }
                 return;
             }
 
             // tslint:disable-next-line:prefer-for-of
-            for (let i = 0;  i < msgs.length;  i++)
-            {
+            for (let i = 0; i < msgs.length; i++) {
                 const msg = msgs[i];
                 // Invoke the callback function for each message that was returned
-                if (onMsgReceived)
-                {
+                if (onMsgReceived) {
                     onMsgReceived(msg);
                 }
 
-                if (this.DeleteMessageAfterConsuming)
-                {
+                if (this.DeleteMessageAfterConsuming) {
                     this.deleteMessage(queueInfo, msg);
                 }
             }
@@ -765,25 +667,20 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<{}>}
      * @memberof SQSClient
      */
-    public deleteMessage(queueInfo: SQSQueueInfo, msg: Message): Promise<{}>
-    {
-        return new Promise((resolve, reject) =>
-        {
+    public deleteMessage(queueInfo: SQSQueueInfo, msg: Message): Promise<{}> {
+        return new Promise((resolve, reject) => {
             const request: SQS.DeleteMessageRequest =
             {
                 QueueUrl: queueInfo.Url,
                 ReceiptHandle: msg.ReceiptHandle,
             };
 
-            this.InternalClient.deleteMessage(request, (err, result) =>
-            {
-                if (err)
-                {
+            this.InternalClient.deleteMessage(request, (err, result) => {
+                if (err) {
                     this.Logger.error(err);
                     reject(err);
                 }
-                else
-                {
+                else {
                     resolve(result);
                 }
             });
@@ -798,27 +695,22 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<string>}
      * @memberof SQSClient
      */
-    public share(queueInfo: SQSQueueInfo, principal: string): Promise<string>
-    {
-        return new Promise((resolve, reject) =>
-        {
+    public share(queueInfo: SQSQueueInfo, principal: string): Promise<string> {
+        return new Promise((resolve, reject) => {
             const request: SQS.AddPermissionRequest =
             {
-                AWSAccountIds: [ principal ],
+                AWSAccountIds: [principal],
                 Actions: ['ReceiveMessage', 'SendMessage'],
                 Label: `AddPermission-${queueInfo.Name}-${principal}`,
                 QueueUrl: queueInfo.Url,
             };
 
-            this.InternalClient.addPermission(request, (err, result) =>
-            {
-                if (err)
-                {
+            this.InternalClient.addPermission(request, (err, result) => {
+                if (err) {
                     this.Logger.error(err);
                     reject(err);
                 }
-                else
-                {
+                else {
                     resolve(request.Label);
                 }
             });
@@ -833,25 +725,20 @@ export class SQSClient extends AWSServiceClient
      * @returns {Promise<boolean>}
      * @memberof SQSClient
      */
-    public unshare(queueInfo: SQSQueueInfo, label: string): Promise<boolean>
-    {
-        return new Promise((resolve, reject) =>
-        {
+    public unshare(queueInfo: SQSQueueInfo, label: string): Promise<boolean> {
+        return new Promise((resolve, reject) => {
             const request: SQS.RemovePermissionRequest =
             {
                 Label: label,
                 QueueUrl: queueInfo.Url,
             };
 
-            this.InternalClient.removePermission(request, (err, result) =>
-            {
-                if (err)
-                {
+            this.InternalClient.removePermission(request, (err, result) => {
+                if (err) {
                     this.Logger.error(err);
                     reject(err);
                 }
-                else
-                {
+                else {
                     resolve(true);
                 }
             });
@@ -860,14 +747,11 @@ export class SQSClient extends AWSServiceClient
 }
 
 /* singleton */
-export class SQSResourceWatcher extends AWSResourceWatcher
-{
+export class SQSResourceWatcher extends AWSResourceWatcher {
     private static instance: SQSResourceWatcher;
 
-    public static Instance(client: SQSClient): SQSResourceWatcher
-    {
-        if (SQSResourceWatcher.instance == null)
-        {
+    public static Instance(client: SQSClient): SQSResourceWatcher {
+        if (SQSResourceWatcher.instance == null) {
             SQSResourceWatcher.instance = new SQSResourceWatcher(client);
         }
         return SQSResourceWatcher.instance;
