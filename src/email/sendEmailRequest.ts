@@ -28,7 +28,7 @@ export class SendEmailRequest implements ISendEmailRequest
             SendEmailRequest.EmailConfig = new ConfigurationManager().Configuration.appSettings.email;
         }
 
-        this.from    = body.from || SendEmailRequest.EmailConfig.defaultSender || "storybuilder@story2.com";
+        this.from    = body.from || SendEmailRequest.EmailConfig.defaultSender || "marc@ctoasaservice.org";
         this.to      = body.to;
         this.cc      = body.cc;
         this.bcc     = body.bcc;
