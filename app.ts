@@ -175,7 +175,7 @@ export class Program implements IDisposable
             return;
         }
 
-        // ws://localhost:3053/story2/ws
+        // ws://localhost:3053/awsmessaging/ws
         Program.websocket = new WebSocket.Server({ server: httpServer, path: '/awsmessaging/ws' });
         Program.websocket.on('connection', (socket) =>
         {
