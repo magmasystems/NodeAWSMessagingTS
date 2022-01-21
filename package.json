@@ -40,7 +40,7 @@
     "express": "^4.16.2",
     "express-oas-generator": "^1.0.7",
     "jade": "^1.11.0",
-    "log4js": "^4.5.0",
+    "log4js": "^6.4.0",
     "method-override": "^3.0.0",
     "newman": "^4.5.1",
     "postman-collection": "^3.5.0",
